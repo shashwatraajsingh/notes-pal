@@ -4,6 +4,11 @@ import prisma from "@/lib/db/prisma";
 import { deviceFingerprintingPlugin } from "./plugins/device-fingerprinting";
 
 export const auth = betterAuth({
+  trustedOrigins: [
+    "http://localhost:3000",
+    "https://notes-pal-rtl9.vercel.app",
+    // Add more Vercel preview URLs or your custom domain here
+  ],
   socialProviders: {
     google: {
       prompt: "select_account",
