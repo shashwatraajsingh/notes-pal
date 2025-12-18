@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <!-- 3D Cube Effect -->
+  <g transform="translate(10, 5)">
+    <!-- Back face (lighter for dark mode) -->
+    <path d="M 15 25 L 65 25 L 75 15 L 25 15 Z" fill="#cccccc"/>
+    <path d="M 65 25 L 65 75 L 75 65 L 75 15 Z" fill="#aaaaaa"/>
+    
+    <!-- Main face -->
+    <rect x="15" y="25" width="50" height="50" rx="3" fill="#ffffff" stroke="#cccccc" stroke-width="2"/>
+    
+    <!-- NP Text -->
+    <text x="40" y="58" font-family="Arial Black, Arial, sans-serif" font-size="26" font-weight="900" fill="#1a1a1a" text-anchor="middle">NP</text>
+    
+    <!-- Decorative line -->
+    <line x1="20" y1="68" x2="60" y2="68" stroke="#ff4444" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg>

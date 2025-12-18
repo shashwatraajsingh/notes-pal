@@ -1,0 +1,155 @@
+import { defineField, defineType } from "sanity";
+
+export const note = defineType({
+  name: "note",
+  title: "Note",
+  type: "document",
+  fields: [
+    defineField({
+      name: "title",
+      type: "string",
+    }),
+    defineField({
+      name: "syllabus",
+      type: "string",
+    }),
+    defineField({
+      name: "slug",
+      type: "slug",
+      options: {
+        source: "title",
+      },
+    }),
+    defineField({
+      name: "university",
+      type: "string",
+      options: {
+        list: [
+          { title: "ABES EC", value: "ABES EC" },
+          { title: "AKTU", value: "AKTU" },
+        ],
+      },
+    }),
+    defineField({
+      name: "degree",
+      type: "string",
+      options: {
+        list: [
+          { title: "B.Tech CSE", value: "btech-cse" },
+          { title: "B.Tech IT", value: "btech-it" },
+        ],
+      },
+    }),
+    defineField({
+      name: "year",
+      type: "string",
+      options: {
+        list: [
+          { title: "1st Year", value: "1st-year" },
+          { title: "2nd Year", value: "2nd-year" },
+          { title: "3rd Year", value: "3rd-year" },
+          { title: "4th Year", value: "4th-year" },
+        ],
+      },
+    }),
+    defineField({
+      name: "semester",
+      type: "string",
+      options: {
+        list: [
+          { title: "1st Semester", value: "1st-semester" },
+          { title: "2nd Semester", value: "2nd-semester" },
+          { title: "3rd Semester", value: "3rd-semester" },
+          { title: "4th Semester", value: "4th-semester" },
+          { title: "5th Semester", value: "5th-semester" },
+          { title: "6th Semester", value: "6th-semester" },
+          { title: "7th Semester", value: "7th-semester" },
+          { title: "8th Semester", value: "8th-semester" },
+        ],
+      },
+    }),
+    defineField({
+      name: "subject",
+      type: "string",
+    }),
+    defineField({
+      name: "type",
+      type: "string",
+      options: {
+        list: [
+          { title: "Notes", value: "NOTES" },
+          { title: "MST", value: "MST" },
+          { title: "PYQ", value: "PYQ" },
+          { title: "One-Shot", value: "ONE-SHOT" },
+          { title: "Video Material", value: "VIDEO-MATERIAL" },
+          { title: "Handwritten Notes", value: "HANDWRITTEN-NOTES" },
+        ],
+      },
+    }),
+    defineField({
+      name: "isPremium",
+      type: "boolean",
+    }),
+    defineField({
+      name: "tier",
+      type: "string",
+      options: {
+        list: [
+          { title: "Tier 1", value: "TIER_1" },
+          { title: "Tier 2", value: "TIER_2" },
+          { title: "Tier 3", value: "TIER_3" },
+        ],
+      },
+      hidden: ({ document }) => !document?.isPremium,
+    }),
+    defineField({
+      name: "contentType",
+      title: "Content Type",
+      type: "string",
+      description: "Choose how you want to provide the note content",
+      options: {
+        list: [
+          { title: "Rich Text (Editor)", value: "richtext" },
+          { title: "PDF Upload", value: "pdf" },
+          { title: "Both (PDF + Rich Text)", value: "both" },
+        ],
+        layout: "radio",
+      },
+      initialValue: "richtext",
+    }),
+    defineField({
+      name: "pdfFile",
+      title: "PDF File",
+      type: "file",
+      description: "Upload a PDF file for this note",
+      options: {
+        accept: ".pdf",
+      },
+      hidden: ({ document }) =>
+        document?.contentType !== "pdf" && document?.contentType !== "both",
+    }),
+    defineField({
+      name: "pdfFileName",
+      title: "PDF Display Name",
+      type: "string",
+      description: "Custom name for the PDF download (optional)",
+      hidden: ({ document }) =>
+        document?.contentType !== "pdf" && document?.contentType !== "both",
+    }),
+    defineField({
+      name: "content",
+      title: "Rich Text Content",
+      type: "array",
+      description: "Write or paste your note content here",
+      of: [
+        { type: "block" },
+        { type: "latex" },
+        { type: "customImage" },
+        { type: "table" },
+        { type: "code" },
+        { type: "youtube" },
+      ],
+      hidden: ({ document }) => document?.contentType === "pdf",
+    }),
+  ],
+});

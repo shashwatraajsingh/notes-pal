@@ -1,0 +1,629 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//  AUTH RELATED MODELS
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
+}
+
+
+// USER RELATED MODELS
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime
+  updatedAt     DateTime
+  role          Role      @default(USER)
+
+  isOnboarded   Boolean   @default(false)
+  isBlocked     Boolean   @default(false)
+  profile       UserProfile?
+  accounts      Account[]
+  sessions      Session[]
+  deviceFingerprints DeviceFingerprint[]
+  reports       Report[]
+
+  // Premium related
+  premiumPurchases     PremiumPurchase[]
+  referredPurchases    PremiumPurchase[] @relation("UserReferrals")
+  referrerRewards      ReferralReward[]  @relation("ReferrerRewards")
+  refereeRewards       ReferralReward[]  @relation("RefereeRewards")
+  
+  // Referral code for this user
+  referralCode         String?           @unique
+  
+  // Wallet for referral earnings
+  walletBalance        Decimal           @default(0)
+  
+  // Current premium status (denormalized for quick access)
+  currentPremiumTier   PremiumTier?
+  premiumExpiryDate    DateTime?
+  isPremiumActive      Boolean           @default(false)
+
+  // Quiz related
+  quizAttempts QuizAttempt[]
+
+  // Flashcard related
+  flashcardVisits FlashcardVisit[]
+
+    // AI Chatbot related
+  chats         Chat[]
+
+  @@map("user")
+}
+
+model Report {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  report    String
+  url       String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum University {
+  MEDICAPS
+  IPS
+}
+
+enum Degree {
+  BTECH_CSE
+  BTECH_IT
+}
+
+enum Year {
+  FIRST_YEAR
+  SECOND_YEAR
+  THIRD_YEAR
+  FOURTH_YEAR
+}
+
+enum Semester {
+  FIRST_SEMESTER
+  SECOND_SEMESTER
+  THIRD_SEMESTER
+  FOURTH_SEMESTER
+  FIFTH_SEMESTER
+  SIXTH_SEMESTER
+  SEVENTH_SEMESTER
+  EIGHTH_SEMESTER
+}
+
+model UserProfile {
+  id        String   @id @default(cuid())
+  userId    String @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  firstName     String
+  lastName      String
+  phoneNumber   String   @unique
+
+  university    University
+  degree        Degree
+  year          Year
+  semester      Semester
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_profile")
+}
+
+model DeviceFingerprint {
+  id           String   @id @default(cuid())
+  userId       String 
+  fingerprint  Json
+  hash         String   @unique
+  isActive     Boolean  @default(true)
+  deviceLabel  String?
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime
+  lastRemovedAt DateTime?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+
+  @@index([userId, isActive], name: "device_user_active_idx")
+  @@index([userId, lastUsedAt], name: "device_user_lastused_idx") 
+  @@index([hash], name: "device_hash_idx")
+  @@index([lastUsedAt], name: "device_lastused_idx")
+  @@map("device_fingerprint")
+}
+
+// ENUMS
+enum PremiumTier {
+  TIER_1
+  TIER_2  
+  TIER_3
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CARD
+  UPI
+  NETBANKING
+  WALLET
+  EMI
+  PAYLATER
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  REFERRAL_BONUS
+}
+
+// PREMIUM PURCHASE MODELS
+
+model PremiumPurchase {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Razorpay specific fields
+  razorpayOrderId     String?   @unique // order_xxx from Razorpay
+  razorpayPaymentId   String?   @unique // pay_xxx from Razorpay
+  razorpaySignature   String?   // For payment verification
+
+  // Purchase details
+  tier              PremiumTier
+  duration          Int           // Duration in days (30, 90, 365)
+  originalAmount    Decimal       // Original amount before discounts
+  discountAmount    Decimal       @default(0) // Total discount applied
+  finalAmount       Decimal       // Amount actually paid
+  currency          String        @default("INR")
+  
+  // Payment details
+  paymentStatus     PaymentStatus @default(PENDING)
+  paymentMethod     PaymentMethod?
+  razorpayFee       Decimal?      // Transaction fee charged by Razorpay
+  razorpayTax       Decimal?      // Tax on transaction fee
+  
+  // Discount & Referral tracking
+  discountCode      String?       // Coupon/discount code used
+  referralCode      String?       // Referral code used
+  referredByUserId  String?       // User who referred this purchase
+  referredBy        User?         @relation("UserReferrals", fields: [referredByUserId], references: [id])
+  
+  // Academic details (from UserProfile)
+  university       University       
+  degree           Degree       
+  year             Year          
+  semester         Semester          
+  
+  // Timestamps
+  purchaseDate      DateTime      @default(now())
+  expiryDate        DateTime
+  isActive          Boolean       @default(false)  // Only true after successful payment
+  
+  // Webhook & Processing
+  webhookProcessed  Boolean       @default(false)  // Track if webhook was processed
+  failureReason     String?       // Store failure reason if payment fails
+  
+  // Relations
+  discounts         PurchaseDiscount[]
+  referralRewards   ReferralReward[]
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([razorpayOrderId])
+  @@index([razorpayPaymentId])
+  @@index([paymentStatus])
+  @@index([tier, isActive])
+  @@index([referredByUserId])
+}
+
+// Track multiple discounts applied to a single purchase
+model PurchaseDiscount {
+  id                String         @id @default(cuid())
+  purchaseId        String
+  purchase          PremiumPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  
+  discountType      DiscountType
+  discountCode      String?        // Coupon code
+  discountValue     Decimal        // Amount or percentage
+  discountAmount    Decimal        // Actual discount amount applied
+  description       String?        // Discount description
+  
+  createdAt         DateTime       @default(now())
+
+  @@index([purchaseId])
+  @@index([discountCode])
+}
+
+// Discount/Coupon management
+model DiscountCoupon {
+  id              String      @id @default(cuid())
+  code            String      @unique
+  description     String?
+  
+  discountType    DiscountType
+  value           Decimal     // Percentage (0-100) or fixed amount
+  maxDiscount     Decimal?    // Max discount for percentage type
+  minOrderAmount  Decimal?    // Minimum order amount to apply
+  
+  // Validity
+  isActive        Boolean     @default(true)
+  validFrom       DateTime    @default(now())
+  validUntil      DateTime?
+  
+  // Usage limits
+  maxUses         Int?        // Total usage limit
+  maxUsesPerUser  Int?        @default(1)
+  currentUses     Int         @default(0)
+  
+  // Applicable tiers
+  applicableTiers PremiumTier[]
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([code])
+  @@index([isActive])
+}
+
+// Referral program tracking
+model ReferralProgram {
+  id                    String      @id @default(cuid())
+  name                  String
+  description           String?
+  
+  // Referrer rewards
+  referrerDiscountType  DiscountType @default(FIXED_AMOUNT)
+  referrerDiscountValue Decimal     // Amount referrer gets
+  
+  // Referee rewards
+  refereeDiscountType   DiscountType @default(FIXED_AMOUNT)
+  refereeDiscountValue  Decimal     // Amount new user gets
+  
+  // Validity
+  isActive              Boolean     @default(true)
+  validFrom             DateTime    @default(now())
+  validUntil            DateTime?
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+}
+
+// Track referral rewards given
+model ReferralReward {
+  id              String         @id @default(cuid())
+  referrerUserId  String
+  referrer        User           @relation("ReferrerRewards", fields: [referrerUserId], references: [id])
+  refereeUserId   String
+  referee         User           @relation("RefereeRewards", fields: [refereeUserId], references: [id])
+  purchaseId      String
+  purchase        PremiumPurchase @relation(fields: [purchaseId], references: [id])
+  
+  rewardAmount    Decimal
+  rewardType      DiscountType
+  isProcessed     Boolean        @default(false)
+  
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([referrerUserId])
+  @@index([refereeUserId])
+  @@index([purchaseId])
+}
+
+
+// QUIZ SYSTEM MODELS
+
+model Quiz {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  subject     String     // Subject as string for flexibility
+  
+  // Academic context
+  university  University
+  degree      Degree
+  year        Year
+  semester    Semester
+  
+  // Quiz settings
+  timeLimit   Int?       // Time limit in minutes
+  marksPerQuestion Int    @default(1) // Fixed marks per question
+  
+  // Quiz state
+  isActive    Boolean    @default(true)
+  isPublished Boolean    @default(false)
+  isAttempted Boolean    @default(false) // Marked true when first user completes
+  
+  // Premium access
+  isPremium   Boolean    @default(false)
+  requiredTier PremiumTier?
+  
+  questions   Question[]
+  attempts    QuizAttempt[]
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([university, degree, year, semester])
+  @@index([subject])
+  @@index([isActive, isPublished])
+  @@index([isPremium, requiredTier])
+  @@map("quiz")
+}
+
+model Question {
+  id            String       @id @default(cuid())
+  quizId        String
+  quiz          Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  question      String
+  explanation   String?      // Explanation for the correct answer
+  order         Int          // Base order for admin (will be randomized in attempts)
+  
+  options       QuestionOption[]
+  answers       QuizAnswer[]
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([quizId, order])
+  @@map("question")
+}
+
+model QuestionOption {
+  id          String   @id @default(cuid())
+  questionId  String
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  text        String
+  isCorrect   Boolean  @default(false)
+  order       Int      // Base order (will be randomized in attempts)
+  
+  answers     QuizAnswer[]
+  
+  createdAt   DateTime @default(now())
+
+  @@index([questionId, order])
+  @@map("question_option")
+}
+
+model QuizAttempt {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizId      String
+  quiz        Quiz       @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  // Randomization seeds
+  questionSeed Int        // Seed for question order randomization
+  optionSeed   Int        // Seed for option order randomization
+  
+  // Score & Performance
+  score        Int        @default(0)    // Total score achieved
+  totalMarks   Int                       // Total possible marks
+  accuracy     Decimal    @default(0)    // Percentage accuracy
+  timeTaken    Int?       // Total time taken in seconds
+  
+  // Attempt state
+  status       AttemptStatus @default(IN_PROGRESS)
+  startedAt    DateTime   @default(now())
+  completedAt  DateTime?
+  
+  answers      QuizAnswer[]
+  
+  @@index([userId, quizId])
+  @@index([userId, completedAt])
+  @@index([status])
+  @@map("quiz_attempt")
+}
+
+model QuizAnswer {
+  id            String         @id @default(cuid())
+  attemptId     String
+  attempt       QuizAttempt    @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId    String
+  question      Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedOptionId String?
+  selectedOption   QuestionOption? @relation(fields: [selectedOptionId], references: [id])
+  
+  isCorrect     Boolean        @default(false)
+  marksAwarded  Int            @default(0)
+  timeTaken     Int?           // Time taken for this question in seconds
+  
+  createdAt     DateTime       @default(now())
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@map("quiz_answer")
+}
+
+// QUIZ ENUMS
+enum AttemptStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+  TIME_UP
+}
+
+// FLASHCARD SYSTEM MODELS
+
+model FlashcardSet {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  subject     String   // Subject as string for flexibility
+  
+  // Academic context
+  university  University
+  degree      Degree
+  year        Year
+  semester    Semester
+  
+  // Set state
+  isActive    Boolean    @default(true)
+  isPublished Boolean    @default(false)
+  
+  // Premium access
+  isPremium   Boolean    @default(false)
+  requiredTier PremiumTier?
+  
+  cards       FlashcardItem[]
+  visits      FlashcardVisit[]
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([university, degree, year, semester])
+  @@index([subject])
+  @@index([isActive, isPublished])
+  @@index([isPremium, requiredTier])
+  @@map("flashcard_set")
+}
+
+model FlashcardItem {
+  id          String       @id @default(cuid())
+  setId       String
+  set         FlashcardSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  
+  // Card content
+  front       String
+  back        String
+  order       Int          // Order within the set
+  
+  visits      FlashcardVisit[]
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([setId, order])
+  @@map("flashcard_item")
+}
+
+model FlashcardVisit {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  setId       String
+  set         FlashcardSet  @relation(fields: [setId], references: [id], onDelete: Cascade)
+  cardId      String?       // Optional - for tracking individual card visits
+  card        FlashcardItem? @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  
+  visitedAt   DateTime      @default(now())
+
+  @@index([userId, setId])
+  @@index([userId, visitedAt])
+  @@map("flashcard_visit")
+}
+
+
+// AI CHATBOT MODELS
+
+model Chat {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Academic context
+  university  University
+  degree      Degree
+  year        Year
+  semester    Semester
+  subject     String   // Subject as string for flexibility
+  
+  // Chat metadata
+  name        String   @default("Untitled Chat") // AI-generated chat name (e.g., "CSE 3rd Sem AI Chat" or AI generated name based on context)
+
+  messages    ChatMessage[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([university, degree, year, semester])
+  @@map("chat")
+}
+
+model ChatMessage {
+  id       String @id @default(cuid())
+  chatId   String
+  chat     Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  
+  // Message content
+  role     MessageRole // USER or ASSISTANT
+  content  String      // The actual message content
+  model    String?     // AI model used (e.g., "gemini-2.0-flash", "gemini-2.5-pro")
+  
+  createdAt DateTime @default(now())
+
+  @@index([chatId, createdAt])
+  @@map("chat_message")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}
