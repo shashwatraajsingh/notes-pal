@@ -15,7 +15,10 @@ const navItems = [
     label: "Notes",
     href: "/notes",
   },
-
+  {
+    label: "Flashcards",
+    href: "/flashcards",
+  },
   {
     label: "Pricing",
     href: "/#pricing",
