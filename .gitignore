@@ -49,3 +49,6 @@ next-env.d.ts
 # husky logs
 .husky/logs/
 .husky/*.log
+# Browser test artifacts
+/playwright-report/
+/test-results/
